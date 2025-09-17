@@ -1,4 +1,0 @@
-../Core/Src/lora.c:91:6:lora_cfg_io	5
-../Core/Src/lora.c:119:9:lora_cfg_mode	7
-../Core/Src/lora.c:166:9:lora_write_register	3
-../Core/Src/lora.c:189:9:lora_send	1
