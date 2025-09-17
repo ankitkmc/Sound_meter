@@ -1,0 +1,4 @@
+../Core/Src/lora.c:113:6:lora_cfg_io	16	static
+../Core/Src/lora.c:147:9:lora_cfg_mode	16	static
+../Core/Src/lora.c:200:9:lora_write_register	32	static
+../Core/Src/lora.c:230:9:lora_send	16	static
