@@ -24,6 +24,9 @@
 
 #include <stdbool.h>
 #include "lora.h"
+#include "oled_display/SH1106.h"
+#include "oled_display/fonts.h"
+#include "oled_display/bitmap.h"
 
 /* USER CODE END Includes */
 
@@ -43,6 +46,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
@@ -61,6 +66,7 @@ uint8_t txBuff[25] = {0};
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
@@ -106,6 +112,8 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
 	uint32_t delay = 0;
+//	char noiseStr[4] = "41.8";
+//	char vibratStr[4] = "23.5";
 
 #define TRASNSPARENT
 //#define RELAY
@@ -140,6 +148,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_Delay(1000); //don't delete wait for lora reset
@@ -163,6 +172,20 @@ int main(void)
 
   	HAL_Delay(100);
   	HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buff, 1);
+
+  	SH1106_Init();
+  	SH1106_GotoXY (25, 25);
+  	SH1106_Puts((char *)"ESCORTS", &Font_11x18, 1);
+//	SH1106_DrawBitmap(2, 0, logo, 128, 64, 1);  // 132x64, so leave 2 from both sides, draw from 0,0
+//  	SH1106_Clear();
+//  	SH1106_DrawRectangle(2, 0, 128, 64, 1);
+//  	SH1106_DrawLine(64, 0, 64, 64, 1);
+//  	SH1106_DrawLine(0, 32, 128, 32, 1);
+//  	SH1106_GotoXY (15, 12);
+//  	SH1106_Puts((char *)"Noise", &Font_7x10, 1);
+//  	SH1106_GotoXY (10, 44);
+//	SH1106_Puts((char *)"Vibrat.", &Font_7x10, 1);
+	SH1106_UpdateScreen();
 
   /* USER CODE END 2 */
 
@@ -205,6 +228,25 @@ int main(void)
 		  packet_ready = ERROR;
 		  lora_send((uint8_t *)buffer);
 		  memset(txBuff, 0x00, strlen((const char *)txBuff));
+
+//		  memcpy(noiseStr, &buffer[0], 4);
+//		  memcpy(vibratStr, &buffer[4], 4);
+
+		  SH1106_Clear();
+		  SH1106_Puts((char *)buffer, &Font_7x10, 1);
+//		  SH1106_DrawRectangle(2, 0, 128, 64, 1);
+//		  SH1106_DrawLine(64, 0, 64, 64, 1);
+//		  SH1106_DrawLine(0, 32, 128, 32, 1);
+//		  SH1106_GotoXY (15, 12);
+//		  SH1106_Puts((char *)"Noise", &Font_7x10, 1);
+//		  SH1106_GotoXY (79, 12);
+//		  SH1106_Puts((char *)noiseStr, &Font_7x10, 1);
+//		  SH1106_GotoXY (10, 44);
+//		  SH1106_Puts((char *)"Vibrat.", &Font_7x10, 1);
+//		  SH1106_GotoXY (79, 44);
+//		  SH1106_Puts((char *)vibratStr, &Font_7x10, 1);
+
+		  SH1106_UpdateScreen();
 	  }
   }
 
@@ -248,6 +290,40 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
