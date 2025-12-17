@@ -22,8 +22,8 @@
 #define RELAY_MODE													0x03
 #define WOR_TRANSMISSION_MODE										0x04
 
-#define MAX_BYTES													240
-#define PACKET_LENGTH												16
+#define MAX_BYTES													50
+#define PACKET_LENGTH												6
 
 #define CFG_HEADER													0xC0
 #define CFG_RETURN													0xC1

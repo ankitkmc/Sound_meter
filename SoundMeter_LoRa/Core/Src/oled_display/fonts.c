@@ -331,6 +331,7 @@ FontDef_t Font_16x26 = {
 	Font16x26
 };
 
+
 char* FONTS_GetStringSize(char* str, FONTS_SIZE_t* SizeStruct, FontDef_t* Font) {
 	/* Fill settings */
 	SizeStruct->Height = Font->FontHeight;

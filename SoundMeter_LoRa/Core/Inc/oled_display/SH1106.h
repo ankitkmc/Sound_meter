@@ -61,7 +61,7 @@ SDA        |PB7          |Serial data line
 /* SH1106 settings */
 /* SH1106 width in pixels */
 #ifndef SH1106_WIDTH
-#define SH1106_WIDTH            128
+#define SH1106_WIDTH            130
 #endif
 /* SH1106 LCD height in pixels */
 #ifndef SH1106_HEIGHT

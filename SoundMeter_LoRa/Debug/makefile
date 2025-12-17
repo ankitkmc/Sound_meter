@@ -11,6 +11,7 @@ RM := rm -rf
 -include sources.mk
 -include Drivers/STM32F1xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
+-include Core/Src/sound_meter/subdir.mk
 -include Core/Src/oled_display/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
@@ -62,7 +63,7 @@ main-build: SoundMeter_LoRa.elf secondary-outputs
 
 # Tool invocations
 SoundMeter_LoRa.elf SoundMeter_LoRa.map: $(OBJS) $(USER_OBJS) D:\EKL_PROJECTS\SOUND_METER\Firmware\SoundMeter_LoRa\STM32F103C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "SoundMeter_LoRa.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\EKL_PROJECTS\SOUND_METER\Firmware\SoundMeter_LoRa\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="SoundMeter_LoRa.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "SoundMeter_LoRa.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\EKL_PROJECTS\SOUND_METER\Firmware\SoundMeter_LoRa\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="SoundMeter_LoRa.map" -Wl,--gc-sections -static -u _scanf_float -u _printf_float --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

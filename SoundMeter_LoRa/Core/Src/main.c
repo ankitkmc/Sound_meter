@@ -22,11 +22,16 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
 #include "lora.h"
 #include "oled_display/SH1106.h"
 #include "oled_display/fonts.h"
 #include "oled_display/bitmap.h"
+#include "sound_meter/svan958a.h"
 
 /* USER CODE END Includes */
 
@@ -37,6 +42,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define TRANSMITTER		0
+#define RECEIVER		1
 
 /* USER CODE END PD */
 
@@ -49,6 +57,7 @@
 I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
@@ -58,7 +67,10 @@ uint8_t packet_ready = ERROR;
 uint8_t rx_buff;
 uint8_t rx_count = 0;
 uint8_t buffer[MAX_BYTES] = {0};
-uint8_t txBuff[25] = {0};
+
+uint8_t rxIndex = 0;
+uint8_t dataReceived = 0;
+uint8_t rxBuffer[15] = {0};
 
 /* USER CODE END PV */
 
@@ -67,6 +79,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
@@ -79,20 +92,38 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart);
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+#if RECEIVER
 	if ((huart == &huart1) && (init_cplt_flag == SUCCESS))
 	{
 		buffer[rx_count++] = rx_buff;
 
-		if (rx_count >= PACKET_LENGTH)
+		if (rx_count == PACKET_LENGTH)
 		{
 			packet_ready = SUCCESS;
-			rx_count = 0; // reset for next packet
-			memcpy(txBuff, buffer, strlen((const char *)buffer));
 		}
 
 		/* Continue receiving */
 		HAL_UART_Receive_IT(&huart1,(uint8_t *)&rx_buff, 1);
 	}
+#elif TRANSMITTER
+	if (huart == &SVAN_UART_HANDLE)
+	{
+		if (rxBuffer[rxIndex] == '\n')
+		{
+			dataReceived = 1;
+		}
+		else
+		{
+			rxIndex++;
+			if (rxIndex >= 12)
+			{
+				rxIndex = 0;
+			}
+		}
+
+		HAL_UART_Receive_IT(&huart2, (uint8_t *)&rxBuffer[rxIndex], 1);
+	}
+#endif
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
@@ -108,22 +139,30 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
   */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
-	uint32_t delay = 0;
-//	char noiseStr[4] = "41.8";
-//	char vibratStr[4] = "23.5";
+#if TRANSMITTER
+	uint8_t command[] = "LPO?\r\n";
+	static uint32_t previousCount;
+	static uint32_t deviceTimeoutCount;
+	char noiseData[6];
+#endif
 
-#define TRASNSPARENT
-//#define RELAY
-//#define WOR
+#if RECEIVER
+	static bool clearScreen = false;
+	static float noiseMaxValue = 0.0;
+	uint8_t bufferMaxVal[50];
+#endif
 
-#ifdef TRASNSPARENT
-	uint8_t transparent_string[] = "This is a transparent message\r\n";
-#elif defined RELAY
+#define TRASNSPARENT	1
+#define RELAY			0
+#define WOR				0
+
+#if TRASNSPARENT
+//	uint8_t transparent_string[] = "This is a transparent message\r\n";
+#elif RELAY
 	uint8_t relay_string[] = "This is a relay message\r\n";
-#elif defined WOR
+#elif WOR
 	uint8_t wor_string[] = "This is a wor message\r\n";
 #endif
 
@@ -149,21 +188,22 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_Delay(1000); //don't delete wait for lora reset
 
-#ifdef TRASNSPARENT
+#if TRASNSPARENT
   while(ERROR == lora_cfg_mode(TRANSPARENT_MODE))
   {
 	  HAL_Delay(500);
   }
-#elif defined RELAY
+#elif RELAY
   while(ERROR == lora_cfg_mode(RELAY_MODE))
   {
 	  HAL_Delay(500);
   }
-#elif defined WOR
+#elif WOR
   while(ERROR == lora_cfg_mode(WOR_TRANSMISSION_MODE))
   {
 	  HAL_Delay(500);
@@ -171,21 +211,46 @@ int main(void)
 #endif
 
   	HAL_Delay(100);
+
+#if RECEIVER
+  	// Initialize LoRa for reception
   	HAL_UART_Receive_IT(&huart1, (uint8_t *)&rx_buff, 1);
 
+  	// Initialize display driver
   	SH1106_Init();
+
+  	// Startup display
   	SH1106_GotoXY (25, 25);
-  	SH1106_Puts((char *)"ESCORTS", &Font_11x18, 1);
-//	SH1106_DrawBitmap(2, 0, logo, 128, 64, 1);  // 132x64, so leave 2 from both sides, draw from 0,0
-//  	SH1106_Clear();
-//  	SH1106_DrawRectangle(2, 0, 128, 64, 1);
-//  	SH1106_DrawLine(64, 0, 64, 64, 1);
-//  	SH1106_DrawLine(0, 32, 128, 32, 1);
-//  	SH1106_GotoXY (15, 12);
-//  	SH1106_Puts((char *)"Noise", &Font_7x10, 1);
-//  	SH1106_GotoXY (10, 44);
-//	SH1106_Puts((char *)"Vibrat.", &Font_7x10, 1);
+	SH1106_Puts((char *)"ESCORTS", &Font_11x18, 1);
 	SH1106_UpdateScreen();
+	HAL_Delay(3000);
+	SH1106_Clear();
+
+  	// GUI
+  	SH1106_GotoXY (10, 5);
+	SH1106_Puts((char *)"Noise (dB)", &Font_7x10, 1);
+  	SH1106_GotoXY (20, 20);
+  	SH1106_Puts((char *)"0.00", &Font_16x26, 1);
+	SH1106_DrawLine(7, 45, 121, 45, 1);
+	SH1106_GotoXY (10, 52);
+	SH1106_Puts((char *)"MAX", &Font_7x10, 1);
+	SH1106_GotoXY (87, 52);
+	SH1106_Puts((char *)"0.00", &Font_7x10, 1);
+
+	SH1106_UpdateScreen();
+
+#elif TRANSMITTER
+	// Start driver
+//	svan_init();
+	HAL_UART_Receive_IT(&SVAN_UART_HANDLE, &rxBuffer[rxIndex], 1);
+
+	// Get initial count
+	previousCount = HAL_GetTick();
+	deviceTimeoutCount = HAL_GetTick();
+
+	// Configure session and START the SVAN
+//	svan_config_and_start();
+#endif
 
   /* USER CODE END 2 */
 
@@ -197,20 +262,20 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-#ifdef TRASNSPARENT
-	  if(delay++ > 18000000)
-	  {
-		  lora_send((uint8_t *)transparent_string);
-		  delay = 0;
-		  LED_Toggle();
-	  }
-#elif defined	RELAY
+#if TRASNSPARENT
+//	  if(delay++ > 18000000)
+//	  {
+//		  lora_send((int8_t *)transparent_string);
+//		  delay = 0;
+//	  }
+
+#elif RELAY
 	  if(delay++ > 18000000)
 	  {
 		  lora_send((int8_t *)relay_string);
 		  delay = 0;
 	  }
-#elif defined WOR
+#elif WOR
 	  if(delay++ > 18000000)
 	  {
 		  delay = 0;
@@ -222,32 +287,83 @@ int main(void)
 	  }
 #endif
 
+#if TRANSMITTER
+	  if(HAL_GetTick() - previousCount > 1000)
+	  {
+		  HAL_UART_Transmit(&huart2, (uint8_t *)command, strlen((char *)command), HAL_MAX_DELAY);
+		  previousCount = HAL_GetTick();
+		  LED_Toggle();
+	  }
+
+	  if (dataReceived)
+	  {
+		  dataReceived = 0;
+
+		  // Parse response
+		  memcpy((char *)noiseData, (char *)&rxBuffer[1], 6);
+		  rxIndex = 0;
+
+		  lora_send((uint8_t *)noiseData);
+
+		  // Reset timeout anchor (we had activity)
+		  deviceTimeoutCount = HAL_GetTick();
+
+		  HAL_UART_Receive_IT(&huart2, (uint8_t *)&rxBuffer[rxIndex], 1);
+
+		  memset((char *)rxBuffer, 0x00, strlen((char *)rxBuffer));
+	  }
+	  else
+	  {
+		  // If no data received for 5 seconds, send fallback and re-arm timer
+		  if ((HAL_GetTick() - deviceTimeoutCount) >= 3000U)
+		  {
+			  lora_send((uint8_t *)"00.00 ");   		// or "0.0" if that is the required format
+			  deviceTimeoutCount = HAL_GetTick(); 		// next fallback in another 5 sec if still idle
+		  }
+	  }
+
+#endif
+
+#if RECEIVER
 	  /* Loop back the received packet (*only for testing purpose*) */
 	  if(packet_ready == SUCCESS)
 	  {
 		  packet_ready = ERROR;
-		  lora_send((uint8_t *)buffer);
-		  memset(txBuff, 0x00, strlen((const char *)txBuff));
 
-//		  memcpy(noiseStr, &buffer[0], 4);
-//		  memcpy(vibratStr, &buffer[4], 4);
+		  if(!clearScreen)
+		  {
+			  clearScreen = true;
+			  SH1106_Clear();
+		  }
 
-		  SH1106_Clear();
-		  SH1106_Puts((char *)buffer, &Font_7x10, 1);
-//		  SH1106_DrawRectangle(2, 0, 128, 64, 1);
-//		  SH1106_DrawLine(64, 0, 64, 64, 1);
-//		  SH1106_DrawLine(0, 32, 128, 32, 1);
-//		  SH1106_GotoXY (15, 12);
-//		  SH1106_Puts((char *)"Noise", &Font_7x10, 1);
-//		  SH1106_GotoXY (79, 12);
-//		  SH1106_Puts((char *)noiseStr, &Font_7x10, 1);
-//		  SH1106_GotoXY (10, 44);
-//		  SH1106_Puts((char *)"Vibrat.", &Font_7x10, 1);
-//		  SH1106_GotoXY (79, 44);
-//		  SH1106_Puts((char *)vibratStr, &Font_7x10, 1);
+		  double NoiseValue = atof((char *)buffer);
+
+		  if(NoiseValue > noiseMaxValue)
+		  {
+			  noiseMaxValue = NoiseValue;
+		  }
+
+		  sprintf((char *)buffer, (char *)"%.2f ", NoiseValue);
+		  sprintf((char *)bufferMaxVal, (char *)"%.2f ", noiseMaxValue);
+
+		  SH1106_GotoXY (10, 5);
+		  SH1106_Puts((char *)"Noise (dB)", &Font_7x10, 1);
+		  SH1106_GotoXY (20, 20);
+		  SH1106_Puts((char *)buffer, &Font_16x26, 1);
+		  SH1106_DrawLine(7, 45, 121, 45, 1);
+		  SH1106_GotoXY (10, 52);
+		  SH1106_Puts((char *)"MAX", &Font_7x10, 1);
+		  SH1106_GotoXY (87, 52);
+		  SH1106_Puts((char *)bufferMaxVal, &Font_7x10, 1);
 
 		  SH1106_UpdateScreen();
+
+		  // reset for next packet
+		  rx_count = 0;
+		  memset((char *)buffer, 0x00, strlen((char *)buffer));
 	  }
+#endif
+
   }
 
   /* USER CODE END 3 */
@@ -360,6 +476,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 9600;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -372,26 +521,15 @@ static void MX_GPIO_Init(void)
   /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LED_Pin|M0_Pin|M1_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, M0_Pin|M1_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : LED_Pin */
-  GPIO_InitStruct.Pin = LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : M0_Pin M1_Pin */
-  GPIO_InitStruct.Pin = M0_Pin|M1_Pin;
+  /*Configure GPIO pins : LED_Pin M0_Pin M1_Pin */
+  GPIO_InitStruct.Pin = LED_Pin|M0_Pin|M1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

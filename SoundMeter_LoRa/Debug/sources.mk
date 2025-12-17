@@ -24,6 +24,7 @@ C_DEPS :=
 SUBDIRS := \
 Core/Src \
 Core/Src/oled_display \
+Core/Src/sound_meter \
 Core/Startup \
 Drivers/STM32F1xx_HAL_Driver/Src \
 
